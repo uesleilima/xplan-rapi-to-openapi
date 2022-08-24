@@ -1,4 +1,4 @@
-package dev.ueslei.rapitoopenapi;
+package dev.ueslei.xplantoopenapi;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

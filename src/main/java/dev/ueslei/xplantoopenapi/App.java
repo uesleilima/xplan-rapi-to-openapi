@@ -1,4 +1,4 @@
-package dev.ueslei.rapitoopenapi;
+package dev.ueslei.xplantoopenapi;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
@@ -6,8 +6,12 @@ import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.PathItem.HttpMethod;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.media.Content;
+import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
+import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.responses.ApiResponses;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -46,8 +50,7 @@ public class App {
         System.out.println(openAPI);
     }
 
-    private static String fetchXplanDocs()
-        throws IOException, URISyntaxException {
+    private static String fetchXplanDocs() throws IOException, URISyntaxException {
         URI uri = URI.create(System.getenv("XPLAN_URI"));
         String username = System.getenv("XPLAN_USERNAME");
         String password = System.getenv("XPLAN_PASSWORD");
@@ -85,6 +88,8 @@ public class App {
         Document document = Jsoup.parse(xplanDocument);
         System.out.println("----------------------------------------");
 
+        var resource = document.select("h2").first().text();
+        var resourceId = resource.replaceAll(" ", "");
         var elements = document.body().getElementsByClass("restpattern");
         var paths = new Paths();
         for (var element : elements) {
@@ -95,7 +100,8 @@ public class App {
             System.out.println("Resource: " + method + " " + pathValue);
 
             var pathItem = new PathItem();
-            var operation = new Operation().operationId(method.name() + "Client");
+            var operation = new Operation().operationId(method.name() + resourceId);
+            var operationSchema = new Schema().name(resourceId + "Response").type("object");
 
             var paramsTable = element.getElementsByClass("restparams").get(0);
             var rows = paramsTable.select("tr");
@@ -108,60 +114,98 @@ public class App {
                     System.out.println("--- Section: " + section + " ---");
                 } else {
                     Elements cols = row.select("td");
-                    Optional<Parameter> parameterOpt = Optional.empty();
-                    var parameter = new Parameter();
+                    Optional<Parameter> parameter = Optional.empty();
+                    Optional<Schema> schemaProperty = Optional.empty();
 
                     for (int j = 0; j < cols.size(); j++) {
                         var col = cols.get(j);
                         if (col.hasClass("restparamcomment")) {
                             System.out.println("\t Comment: " + col.text());
                         } else {
-                            parameterOpt = Optional.of(parameter);
-
                             String colValue = col.text();
                             System.out.println("\t\t" + colValue);
 
                             var fieldSpec = FieldSpecification.fromIndex(j);
-                            switch (fieldSpec) {
-                                case NAME:
-                                    parameter.setName(colValue);
-                                    break;
-                                case RESTRICTION:
-                                    parameter.setRequired(!"(optional)".contains(colValue));
-                                    break;
-                                case TYPE:
-                                    parameter.setSchema(new Schema().type(colValue));
-                                    break;
-                                case DESCRIPTION:
-                                    parameter.setDescription(colValue);
-                                    break;
-                            }
 
                             switch (section) {
                                 case ARGUMENTS:
-                                    parameter.in("path");
+                                    parameter = Optional.of(populateParameter(parameter, fieldSpec, colValue, "path"));
                                     break;
                                 case PARAMETERS:
-                                    parameter.in("query");
+                                    parameter = Optional.of(populateParameter(parameter, fieldSpec, colValue, "query"));
                                     break;
                                 case RESPONSE:
-                                    parameterOpt = Optional.empty();
+                                    schemaProperty = Optional.of(
+                                        populateSchemaProperty(schemaProperty, fieldSpec, colValue));
                                     break;
                             }
                         }
                     }
-                    parameterOpt.ifPresent(operation::addParametersItem);
+
+                    parameter.ifPresent(operation::addParametersItem);
+                    schemaProperty.ifPresent(s -> operationSchema.addProperty(s.getName(), s));
                 }
             }
+
+            operation.responses(new ApiResponses()
+                .addApiResponse("200", new ApiResponse()
+                    .content(new Content()
+                        .addMediaType("application/json", new MediaType().schema(operationSchema)))));
 
             pathItem.operation(method, operation);
             paths.addPathItem(pathValue, pathItem);
         }
 
-        OpenAPI openAPI = new OpenAPI().openapi("3.0.3").info(new Info().title("Entity Client API").version("1.0.0"));
-        openAPI.paths(paths);
+        OpenAPI openAPI = new OpenAPI()
+            .openapi("3.0.3")
+            .info(new Info().title(resource + " API").version("1.0.0"))
+            .paths(paths);
 
         return openAPI;
+    }
+
+    private static Schema populateSchemaProperty(Optional<Schema> schemaPropertyOptional,
+        FieldSpecification fieldSpec, String value) {
+        Schema schemaProperty = schemaPropertyOptional.orElse(new Schema());
+        switch (fieldSpec) {
+            case NAME:
+                schemaProperty.setName(value);
+                break;
+            case RESTRICTION:
+                if (!"optional".contains(value)) {
+                    schemaProperty.addRequiredItem(schemaProperty.getName());
+                }
+                break;
+            case TYPE:
+                schemaProperty.setType(value);
+                break;
+            case DESCRIPTION:
+                schemaProperty.setDescription(value);
+                break;
+        }
+        return schemaProperty;
+    }
+
+    private static Parameter populateParameter(Optional<Parameter> parameterOptional,
+        FieldSpecification fieldSpec,
+        String value,
+        String in) {
+        Parameter parameter = parameterOptional.orElse(new Parameter());
+        switch (fieldSpec) {
+            case NAME:
+                parameter.setName(value);
+                break;
+            case RESTRICTION:
+                parameter.setRequired(!"optional".contains(value));
+                break;
+            case TYPE:
+                parameter.setSchema(new Schema().type(value));
+                break;
+            case DESCRIPTION:
+                parameter.setDescription(value);
+                break;
+        }
+        return parameter.in(in);
     }
 
     private enum FieldSpecification {
