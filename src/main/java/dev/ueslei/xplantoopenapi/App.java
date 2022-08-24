@@ -1,5 +1,6 @@
 package dev.ueslei.xplantoopenapi;
 
+import io.swagger.v3.core.util.ObjectMapperFactory;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
@@ -47,7 +48,10 @@ public class App {
 
         OpenAPI openAPI = generateOpenApiSpec(xplanDocument);
         System.out.println("----------------------------------------");
-        System.out.println(openAPI);
+
+        var mapper = ObjectMapperFactory.buildStrictGenericObjectMapper();
+        var specJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(openAPI);
+        System.out.println(specJson);
     }
 
     private static String fetchXplanDocs() throws IOException, URISyntaxException {
@@ -86,7 +90,6 @@ public class App {
 
     private static OpenAPI generateOpenApiSpec(String xplanDocument) {
         Document document = Jsoup.parse(xplanDocument);
-        System.out.println("----------------------------------------");
 
         var resource = document.select("h2").first().text();
         var resourceId = resource.replaceAll(" ", "");
@@ -97,9 +100,7 @@ public class App {
             var pathParts = request.text().split(" ");
             var method = HttpMethod.valueOf(pathParts[0]);
             var pathValue = pathParts[1];
-            System.out.println("Resource: " + method + " " + pathValue);
 
-            var pathItem = new PathItem();
             var operation = new Operation().operationId(method.name() + resourceId);
             var operationSchema = new Schema().name(resourceId + "Response").type("object");
 
@@ -111,7 +112,6 @@ public class App {
                 Element header = row.select("th").first();
                 if (header != null) {
                     section = DocumentSection.fromValue(header.text());
-                    System.out.println("--- Section: " + section + " ---");
                 } else {
                     Elements cols = row.select("td");
                     Optional<Parameter> parameter = Optional.empty();
@@ -123,8 +123,6 @@ public class App {
                             System.out.println("\t Comment: " + col.text());
                         } else {
                             String colValue = col.text();
-                            System.out.println("\t\t" + colValue);
-
                             var fieldSpec = FieldSpecification.fromIndex(j);
 
                             switch (section) {
@@ -152,6 +150,8 @@ public class App {
                     .content(new Content()
                         .addMediaType("application/json", new MediaType().schema(operationSchema)))));
 
+            var existingPathItem = Optional.ofNullable(paths.get(pathValue));
+            var pathItem = existingPathItem.orElse(new PathItem());
             pathItem.operation(method, operation);
             paths.addPathItem(pathValue, pathItem);
         }
