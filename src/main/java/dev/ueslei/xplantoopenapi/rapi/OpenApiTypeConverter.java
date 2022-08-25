@@ -25,6 +25,7 @@ public class OpenApiTypeConverter {
 
         if (typeValue.toLowerCase().contains("array")) {
             oasType = "array";
+            field.items(new StringSchema());
         }
 
         if (typeValue.toLowerCase().contains("array of string")) {

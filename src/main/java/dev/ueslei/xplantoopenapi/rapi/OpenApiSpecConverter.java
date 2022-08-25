@@ -90,7 +90,7 @@ public class OpenApiSpecConverter {
             }
 
             operation.responses(new ApiResponses()
-                .addApiResponse("200", new ApiResponse()
+                .addApiResponse("200", new ApiResponse().description("Success")
                     .content(new Content()
                         .addMediaType("application/json", new MediaType()
                             .schema(reprocessResponse(operationSchema, isArraySection))))));

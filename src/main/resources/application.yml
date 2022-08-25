@@ -1,5 +1,5 @@
 xplan:
   authentication:
-    password: ${XPLAN_PASSWORD}
     username: ${XPLAN_USERNAME}
+    password: ${XPLAN_PASSWORD}
 
