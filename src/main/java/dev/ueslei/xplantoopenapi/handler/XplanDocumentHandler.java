@@ -35,8 +35,8 @@ public class XplanDocumentHandler {
         System.out.println("----------------------------------------");
     }
 
-    @ShellMethod("Exports a XPLAN Resourceful API document into an OpenApi 3 specification json file.")
-    public void export(String uri, String output) throws Exception {
+    @ShellMethod("Generates a XPLAN Resourceful API document into an OpenApi 3 specification json file.")
+    public void generate(String uri, String output) throws Exception {
         OpenAPI oasSpec = generateOasSpec(uri);
         mapper.writerWithDefaultPrettyPrinter().writeValue(Path.of(output).toFile(), oasSpec);
     }
