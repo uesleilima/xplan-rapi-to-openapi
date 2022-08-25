@@ -17,6 +17,7 @@ import io.swagger.v3.oas.models.responses.ApiResponses;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +45,7 @@ public class OpenApiSpecConverter {
             var method = HttpMethod.valueOf(pathParts[0]);
             var pathValue = formatPath(pathParts[1]);
 
-            var operation = new Operation().operationId(method.name() + resourceId);
+            var operation = new Operation().operationId(method.name().toLowerCase() + resourceId);
             var operationSchema = new ObjectSchema().name(resourceId + "Response");
 
             var paramsTable = element.getElementsByClass("restparams").get(0);
@@ -88,7 +89,7 @@ public class OpenApiSpecConverter {
                     schemaProperty.ifPresent(s -> operationSchema.addProperty(s.getName(), s));
                 }
             }
-
+            aggregateParameterArrays(operation);
             operation.responses(new ApiResponses()
                 .addApiResponse("200", new ApiResponse().description("Success")
                     .content(new Content()
@@ -131,7 +132,7 @@ public class OpenApiSpecConverter {
      * @return
      */
     private Schema reprocessResponse(Schema operationSchema, boolean isArraySection) {
-        aggregateArrays(operationSchema);
+        aggregateResponseArrays(operationSchema);
 
         flattenRequiredFields(operationSchema);
 
@@ -147,11 +148,11 @@ public class OpenApiSpecConverter {
      * @param operationSchema
      * @return
      */
-    private void aggregateArrays(Schema operationSchema) {
+    private void aggregateResponseArrays(Schema operationSchema) {
         if (operationSchema.getProperties() == null) {
             return;
         }
-        List<Schema> properties = new ArrayList<Schema>(operationSchema.getProperties().values());
+        var properties = new ArrayList<Schema>(operationSchema.getProperties().values());
         properties.stream()
             .filter(p -> p.getType().equals("array"))
             .forEach(arrayField -> {
@@ -170,6 +171,30 @@ public class OpenApiSpecConverter {
                 flattenRequiredFields(itemsSchema);
                 arrayField.type("array").setItems(itemsSchema);
             });
+    }
+
+    private void aggregateParameterArrays(Operation operation) {
+        if (operation.getParameters() == null) {
+            return;
+        }
+        var toClean = new ArrayList<Parameter>();
+        operation.getParameters().stream()
+            .filter(p -> p.getSchema().getType().equals("array"))
+            .forEach(arrayParam -> {
+                var arrayFieldName = arrayParam.getName();
+                var itemsSchema = new ObjectSchema();
+                operation.getParameters().stream()
+                    .filter(Objects::nonNull)
+                    .filter(p -> !p.equals(arrayParam) && p.getName().startsWith(arrayFieldName))
+                    .map(p -> {
+                        var sanitizedName = p.getName().replace(arrayFieldName + "[n].", "");
+                        toClean.add(p);
+                        return new Schema().name(sanitizedName).type(p.getSchema().getType());
+                    })
+                    .forEach(i -> itemsSchema.addProperty(i.getName(), i));
+                arrayParam.getSchema().type("array").setItems(itemsSchema);
+            });
+        operation.getParameters().removeAll(toClean);
     }
 
     /**
