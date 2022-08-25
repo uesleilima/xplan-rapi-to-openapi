@@ -6,8 +6,10 @@ import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.PathItem.HttpMethod;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
+import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.responses.ApiResponse;
@@ -17,13 +19,17 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-public class OpenApiConverter {
+@Component
+@RequiredArgsConstructor
+public class OpenApiSpecConverter {
+
+    private final OpenApiTypeConverter typeConverter;
 
     public OpenAPI generateOpenApiSpec(String xplanDocument) {
         Document document = Jsoup.parse(xplanDocument);
@@ -39,25 +45,25 @@ public class OpenApiConverter {
             var pathValue = formatPath(pathParts[1]);
 
             var operation = new Operation().operationId(method.name() + resourceId);
-            var operationSchema = new Schema().name(resourceId + "Response").type("object");
+            var operationSchema = new ObjectSchema().name(resourceId + "Response");
 
             var paramsTable = element.getElementsByClass("restparams").get(0);
             var rows = paramsTable.select("tr");
             DocumentSection section = null;
             boolean isArraySection = false;
             for (int i = 0; i < rows.size(); i++) {
-                Element row = rows.get(i);
-                Element header = row.select("th").first();
+                var row = rows.get(i);
+                var header = row.select("th").first();
                 if (header != null) {
                     section = DocumentSection.fromValue(header.text());
                 } else {
-                    Elements cols = row.select("td");
+                    var cols = row.select("td");
                     Optional<Parameter> parameter = Optional.empty();
                     Optional<Schema> schemaProperty = Optional.empty();
 
                     for (int j = 0; j < cols.size(); j++) {
                         var col = cols.get(j);
-                        String colValue = col.text();
+                        var colValue = col.text();
                         if (col.hasClass("restparamcomment")) {
                             isArraySection = colValue.contains("Array of Objects");
                         } else {
@@ -94,7 +100,7 @@ public class OpenApiConverter {
             paths.addPathItem(pathValue, pathItem);
         }
 
-        OpenAPI openAPI = new OpenAPI()
+        var openAPI = new OpenAPI()
             .openapi("3.0.3")
             .info(new Info().title(resource + " API").version("1.0.0"))
             .paths(paths);
@@ -130,31 +136,31 @@ public class OpenApiConverter {
         flattenRequiredFields(operationSchema);
 
         if (isArraySection) {
-            return new Schema<>().type("array").items(operationSchema);
+            return new ArraySchema().items(operationSchema);
         }
         return operationSchema;
     }
 
     /**
      * Reprocess properties after finally parsed, so we can create aggregated array fields.
-     * <p>
-     * Example: owners	        	    Array of Object owners[n].percentage		Float owners[n].owner_id		EntityId ≡
-     * Integer(min=0)* *
      *
      * @param operationSchema
      * @return
      */
     private void aggregateArrays(Schema operationSchema) {
+        if (operationSchema.getProperties() == null) {
+            return;
+        }
         List<Schema> properties = new ArrayList<Schema>(operationSchema.getProperties().values());
         properties.stream()
-            .filter(p -> p.getType().equals("Array of Object"))
+            .filter(p -> p.getType().equals("array"))
             .forEach(arrayField -> {
                 var arrayFieldName = arrayField.getName();
-                var itemsSchema = new Schema();
+                var itemsSchema = new ObjectSchema();
                 properties.stream().filter(p -> !p.equals(arrayField) && p.getName().startsWith(arrayFieldName))
                     .map(s -> {
                         operationSchema.getProperties().remove(s.getName());
-                        String sanitizedName = s.getName().replace(arrayFieldName + "[n].", "");
+                        var sanitizedName = s.getName().replace(arrayFieldName + "[n].", "");
                         if (!CollectionUtils.isEmpty(s.getRequired())) {
                             s.setRequired(List.of(sanitizedName));
                         }
@@ -178,8 +184,7 @@ public class OpenApiConverter {
 
         List<String> requiredFields = new ArrayList<>();
         for (Object property : schema.getProperties().values()) {
-            Schema propertySchema = (Schema) property;
-            if (!CollectionUtils.isEmpty(propertySchema.getRequired())) {
+            if (property instanceof Schema propertySchema && !CollectionUtils.isEmpty(propertySchema.getRequired())) {
                 requiredFields.addAll(propertySchema.getRequired());
                 propertySchema.setRequired(null);
             }
@@ -190,7 +195,7 @@ public class OpenApiConverter {
 
     private Schema populateSchemaProperty(Optional<Schema> schemaPropertyOptional,
         FieldSpecification fieldSpec, String value) {
-        Schema schemaProperty = schemaPropertyOptional.orElse(new Schema());
+        var schemaProperty = schemaPropertyOptional.orElse(new Schema());
         switch (fieldSpec) {
             case NAME:
                 schemaProperty.setName(value);
@@ -215,7 +220,7 @@ public class OpenApiConverter {
         FieldSpecification fieldSpec,
         String value,
         String in) {
-        Parameter parameter = parameterOptional.orElse(new Parameter());
+        var parameter = parameterOptional.orElse(new Parameter());
         switch (fieldSpec) {
             case NAME:
                 parameter.setName(value);
@@ -234,8 +239,7 @@ public class OpenApiConverter {
     }
 
     private Schema populateType(Schema field, String typeValue) {
-        // TODO: Convert XPLAN types into OpenaApi types
-        return field.type(typeValue);
+        return typeConverter.convertFieldType(field, typeValue);
     }
 
 }

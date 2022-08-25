@@ -1,11 +1,11 @@
 package dev.ueslei.xplantoopenapi.handler;
 
-import dev.ueslei.xplantoopenapi.rapi.OpenApiConverter;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.ueslei.xplantoopenapi.rapi.OpenApiSpecConverter;
 import io.swagger.v3.core.util.ObjectMapperFactory;
 import io.swagger.v3.oas.models.OpenAPI;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import lombok.RequiredArgsConstructor;
 import org.apache.hc.client5.http.ClientProtocolException;
 import org.apache.hc.client5.http.auth.AuthScope;
@@ -29,22 +29,24 @@ import org.springframework.shell.standard.ShellMethod;
 public class XplanDocumentHandler {
 
     private final XplanDocumentProperties properties;
+    private final OpenApiSpecConverter converter;
+    private final ObjectMapper mapper = ObjectMapperFactory.buildStrictGenericObjectMapper();
 
     @ShellMethod("Converts a XPLAN Resourceful API document into an OpenApi 3 specification.")
     public void convert(String uri) throws Exception {
-        String xplanDocument = fetchXplanDocs(uri);
+        String xplanDocument = fetchXplanDocument(uri);
 //        String xplanDocument = Files.readString(Paths.get(
 //            "/Users/ueslei/Library/Application Support/JetBrains/IntelliJIdea2022.2/scratches/scratch_9.html"));
 
-        OpenAPI openAPI = new OpenApiConverter().generateOpenApiSpec(xplanDocument);
+        OpenAPI openAPI = converter.generateOpenApiSpec(xplanDocument);
         System.out.println("----------------------------------------");
-
-        var mapper = ObjectMapperFactory.buildStrictGenericObjectMapper();
         var specJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(openAPI);
         System.out.println(specJson);
+
+        System.out.println("----------------------------------------");
     }
 
-    private String fetchXplanDocs(String apiUri) throws IOException, URISyntaxException {
+    private String fetchXplanDocument(String apiUri) throws IOException {
         URI uri = URI.create(apiUri);
         var auth = properties.getAuthentication();
 

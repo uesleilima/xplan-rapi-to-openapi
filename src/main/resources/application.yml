@@ -1,0 +1,5 @@
+xplan:
+  authentication:
+    password: ${XPLAN_PASSWORD}
+    username: ${XPLAN_USERNAME}
+
