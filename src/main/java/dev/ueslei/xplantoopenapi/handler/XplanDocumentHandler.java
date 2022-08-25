@@ -1,80 +1,44 @@
 package dev.ueslei.xplantoopenapi.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.ueslei.xplantoopenapi.http.XplanRapiHttpClient;
 import dev.ueslei.xplantoopenapi.rapi.OpenApiSpecConverter;
 import io.swagger.v3.core.util.ObjectMapperFactory;
 import io.swagger.v3.oas.models.OpenAPI;
 import java.io.IOException;
-import java.net.URI;
+import java.nio.file.Path;
 import lombok.RequiredArgsConstructor;
-import org.apache.hc.client5.http.ClientProtocolException;
-import org.apache.hc.client5.http.auth.AuthScope;
-import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
-import org.apache.hc.client5.http.classic.methods.HttpOptions;
-import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.HttpEntity;
-import org.apache.hc.core5.http.HttpStatus;
-import org.apache.hc.core5.http.ParseException;
-import org.apache.hc.core5.http.io.HttpClientResponseHandler;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
 
 @ShellComponent
 @RequiredArgsConstructor
-@EnableConfigurationProperties(XplanDocumentProperties.class)
 public class XplanDocumentHandler {
 
-    private final XplanDocumentProperties properties;
+    private final XplanRapiHttpClient client;
     private final OpenApiSpecConverter converter;
     private final ObjectMapper mapper = ObjectMapperFactory.buildStrictGenericObjectMapper();
 
     @ShellMethod("Converts a XPLAN Resourceful API document into an OpenApi 3 specification.")
     public void convert(String uri) throws Exception {
-        String xplanDocument = fetchXplanDocument(uri);
-//        String xplanDocument = Files.readString(Paths.get(
-//            "/Users/ueslei/Library/Application Support/JetBrains/IntelliJIdea2022.2/scratches/scratch_9.html"));
+        OpenAPI oasSpec = generateOasSpec(uri);
+        String specJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(oasSpec);
 
-        OpenAPI openAPI = converter.generateOpenApiSpec(xplanDocument);
         System.out.println("----------------------------------------");
-        var specJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(openAPI);
         System.out.println(specJson);
-
         System.out.println("----------------------------------------");
     }
 
-    private String fetchXplanDocument(String apiUri) throws IOException {
-        URI uri = URI.create(apiUri);
-        var auth = properties.getAuthentication();
-
-        BasicCredentialsProvider credsProvider = new BasicCredentialsProvider();
-        credsProvider.setCredentials(new AuthScope(uri.getHost(), -1),
-            new UsernamePasswordCredentials(auth.getUsername(), auth.getPassword().toCharArray()));
-
-        try (CloseableHttpClient httpclient = HttpClients.custom()
-            .setDefaultCredentialsProvider(credsProvider)
-            .build()) {
-            HttpOptions httpOptions = new HttpOptions(uri);
-            httpOptions.setHeader("Accept", "*/*");
-
-            HttpClientResponseHandler<String> responseHandler = response -> {
-                int status = response.getCode();
-                if (status >= HttpStatus.SC_SUCCESS && status < HttpStatus.SC_REDIRECTION) {
-                    HttpEntity entity = response.getEntity();
-                    try {
-                        return entity != null ? EntityUtils.toString(entity) : null;
-                    } catch (ParseException ex) {
-                        throw new ClientProtocolException(ex);
-                    }
-                } else {
-                    throw new ClientProtocolException("Unexpected response status: " + status);
-                }
-            };
-            return httpclient.execute(httpOptions, responseHandler);
-        }
+    @ShellMethod("Exports a XPLAN Resourceful API document into an OpenApi 3 specification json file.")
+    public void export(String uri, String path) throws Exception {
+        OpenAPI oasSpec = generateOasSpec(uri);
+        mapper.writerWithDefaultPrettyPrinter().writeValue(Path.of(path).toFile(), oasSpec);
     }
+
+    private OpenAPI generateOasSpec(String uri) throws IOException {
+        String xplanDocument = client.fetchXplanDocument(uri);
+        return converter.generateOpenApiSpec(xplanDocument);
+    }
+
 
 }
