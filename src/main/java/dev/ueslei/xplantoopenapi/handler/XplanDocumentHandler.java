@@ -16,6 +16,7 @@ import org.apache.hc.client5.http.auth.AuthenticationException;
 import org.apache.hc.core5.http.ParseException;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
+import org.springframework.shell.standard.ShellOption;
 
 @ShellComponent
 @RequiredArgsConstructor
@@ -27,24 +28,20 @@ public class XplanDocumentHandler {
         .addMixIn(Schema.class, SchemaMixin.class)
         .addMixIn(MediaType.class, MediaTypeMixin.class);
 
-    @ShellMethod("Converts a XPLAN Resourceful API document into an OpenApi 3 specification.")
-    public void convert(String uri) throws Exception {
-        OpenAPI oasSpec = generateOasSpec(uri);
-        String specJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(oasSpec);
-
-        System.out.println("----------------------------------------");
-        System.out.println(specJson);
-        System.out.println("----------------------------------------");
-    }
-
-    @ShellMethod("Generates a XPLAN Resourceful API document into an OpenApi 3 specification json file.")
-    public void generate(String uri, String output) throws Exception {
-        OpenAPI oasSpec = generateOasSpec(uri);
-        mapper.writerWithDefaultPrettyPrinter().writeValue(Path.of(output).toFile(), oasSpec);
+    @ShellMethod("Generates a XPLAN Resourceful API document into an OpenApi 3 specification json.")
+    public void generate(String uri, @ShellOption(defaultValue = "") String output) throws Exception {
+        var oasSpec = generateOasSpec(uri);
+        var writer = mapper.writerWithDefaultPrettyPrinter();
+        if (output.isEmpty()) {
+            var json = writer.writeValueAsString(oasSpec);
+            System.out.println(json);
+        } else {
+            writer.writeValue(Path.of(output).toFile(), oasSpec);
+        }
     }
 
     private OpenAPI generateOasSpec(String uri) throws IOException, ParseException, AuthenticationException {
-        String xplanDocument = client.fetchXplanDocument(uri);
+        var xplanDocument = client.fetchXplanDocument(uri);
         return converter.generateOpenApiSpec(xplanDocument);
     }
 
