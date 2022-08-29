@@ -18,9 +18,13 @@ public class XplanRapiProperties {
     public static class Authentication {
 
         @NotEmpty
+        private String loginPath;
+        @NotEmpty
         private String username;
         @NotEmpty
         private String password;
+        @NotEmpty
+        private String appId;
 
     }
 

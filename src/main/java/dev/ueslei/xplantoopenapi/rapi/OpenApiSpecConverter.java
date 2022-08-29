@@ -66,7 +66,7 @@ public class OpenApiSpecConverter {
                         var col = cols.get(j);
                         var colValue = col.text();
                         if (col.hasClass("restparamcomment")) {
-                            isArraySection = colValue.contains("Array of Objects");
+                            isArraySection = colValue.contains("Array of Object");
                         } else {
                             var fieldSpec = FieldSpecification.fromIndex(j);
 

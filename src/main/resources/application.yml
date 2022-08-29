@@ -1,5 +1,10 @@
+spring:
+  main:
+    banner-mode: off
 xplan:
   authentication:
+    login-path: /resourceful/session/user
     username: ${XPLAN_USERNAME}
     password: ${XPLAN_PASSWORD}
+    app-id: ${XPLAN_APP_ID}
 

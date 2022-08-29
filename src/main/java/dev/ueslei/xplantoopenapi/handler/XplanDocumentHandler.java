@@ -12,6 +12,8 @@ import io.swagger.v3.oas.models.media.Schema;
 import java.io.IOException;
 import java.nio.file.Path;
 import lombok.RequiredArgsConstructor;
+import org.apache.hc.client5.http.auth.AuthenticationException;
+import org.apache.hc.core5.http.ParseException;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
 
@@ -41,7 +43,7 @@ public class XplanDocumentHandler {
         mapper.writerWithDefaultPrettyPrinter().writeValue(Path.of(output).toFile(), oasSpec);
     }
 
-    private OpenAPI generateOasSpec(String uri) throws IOException {
+    private OpenAPI generateOasSpec(String uri) throws IOException, ParseException, AuthenticationException {
         String xplanDocument = client.fetchXplanDocument(uri);
         return converter.generateOpenApiSpec(xplanDocument);
     }

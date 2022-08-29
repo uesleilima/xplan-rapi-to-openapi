@@ -13,6 +13,7 @@ This is an example on how to generate an OpenAPI specification for the `/resourc
 ```shell
 export XPLAN_USERNAME=myusername
 export XPLAN_PASSWORD=mypassword
+export XPLAN_APP_ID=myappid
 ./mvnw spring-boot:run
 shell:> generate --uri https://<xplan-host>/resourceful/entity/client/:entity_id/asset --output ./asset_collection_api.json
 ```
