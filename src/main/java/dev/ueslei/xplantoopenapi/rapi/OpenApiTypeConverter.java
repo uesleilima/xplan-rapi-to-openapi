@@ -1,5 +1,7 @@
 package dev.ueslei.xplantoopenapi.rapi;
 
+import io.swagger.v3.oas.models.media.DateSchema;
+import io.swagger.v3.oas.models.media.NumberSchema;
 import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
@@ -16,7 +18,9 @@ public class OpenApiTypeConverter {
         }
 
         if (typeValue.toLowerCase().contains("decimal")) {
-            oasType = "number";
+            oasType = "object";
+            field.addProperty("_val", new NumberSchema());
+            field.addProperty("_type", new StringSchema());
         }
 
         if (typeValue.toLowerCase().contains("boolean")) {
@@ -42,7 +46,9 @@ public class OpenApiTypeConverter {
         }
 
         if (typeValue.toLowerCase().contains("date")) {
-            field.format("date");
+            oasType = "object";
+            field.addProperty("_val", new DateSchema());
+            field.addProperty("_type", new StringSchema());
         }
 
         return field.type(oasType);

@@ -192,7 +192,9 @@ public class OpenApiSpecConverter {
                         return new Schema().name(sanitizedName).type(p.getSchema().getType());
                     })
                     .forEach(i -> itemsSchema.addProperty(i.getName(), i));
-                arrayParam.getSchema().type("array").setItems(itemsSchema);
+                if (!CollectionUtils.isEmpty(itemsSchema.getProperties())) {
+                    arrayParam.getSchema().type("array").setItems(itemsSchema);
+                }
             });
         operation.getParameters().removeAll(toClean);
     }
@@ -254,7 +256,7 @@ public class OpenApiSpecConverter {
                 parameter.setRequired(!value.contains("optional"));
                 break;
             case TYPE:
-                parameter.setSchema(populateType(new Schema(), value));
+                parameter.setSchema(populateType(new Schema().name(parameter.getName()), value));
                 break;
             case DESCRIPTION:
                 parameter.setDescription(value);
