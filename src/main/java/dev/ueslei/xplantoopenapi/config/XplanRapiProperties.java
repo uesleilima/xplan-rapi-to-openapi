@@ -11,8 +11,6 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "xplan")
 public class XplanRapiProperties {
 
-    public static final String XPLAN_API_KEY_NAME = "X-Xplan-App-Id";
-
     @NotNull
     private Authentication authentication;
 
@@ -26,7 +24,9 @@ public class XplanRapiProperties {
         @NotEmpty
         private String password;
         @NotEmpty
-        private String appId;
+        private String apiKeyName;
+        @NotEmpty
+        private String apiKeyValue;
 
     }
 

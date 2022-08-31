@@ -77,7 +77,7 @@ public class XplanRapiHttpClient {
             .build()) {
 
             HttpGet httpGet = new HttpGet(loginUri);
-            httpGet.addHeader(XplanRapiProperties.XPLAN_API_KEY_NAME, authProperties.getAppId());
+            httpGet.setHeader(authProperties.getApiKeyName(), authProperties.getApiKeyValue());
 
             CloseableHttpResponse response = httpclient.execute(httpGet);
 

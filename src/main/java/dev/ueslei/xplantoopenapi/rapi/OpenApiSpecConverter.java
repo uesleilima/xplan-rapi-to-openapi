@@ -1,6 +1,7 @@
 package dev.ueslei.xplantoopenapi.rapi;
 
 import dev.ueslei.xplantoopenapi.config.XplanRapiProperties;
+import dev.ueslei.xplantoopenapi.http.XplanRapiHttpClient;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
@@ -22,6 +23,9 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.security.SecurityScheme.In;
 import io.swagger.v3.oas.models.security.SecurityScheme.Type;
+import io.swagger.v3.oas.models.servers.Server;
+import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,6 +33,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.apache.hc.client5.http.auth.AuthenticationException;
+import org.apache.hc.core5.http.ParseException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Component;
@@ -40,7 +46,12 @@ public class OpenApiSpecConverter {
 
     private final OpenApiTypeConverter typeConverter;
 
-    public OpenAPI generateOpenApiSpec(String xplanDocument) {
+    private final XplanRapiProperties properties;
+
+    private final XplanRapiHttpClient client;
+
+    public OpenAPI generateOpenApiSpec(String uri) throws AuthenticationException, IOException, ParseException {
+        var xplanDocument = client.fetchXplanDocument(uri);
         Document document = Jsoup.parse(xplanDocument);
 
         var resource = document.select("h2").first().text();
@@ -112,11 +123,16 @@ public class OpenApiSpecConverter {
             paths.addPathItem(pathValue, pathItem);
         }
 
-        var openAPI = new OpenAPI()
+        return new OpenAPI()
             .openapi("3.0.3")
             .info(new Info().title(resource + " API").version("1.0.0"))
+            .addServersItem(new Server().description("Development Server").url(URI.create(uri).getHost()))
+            .addSecurityItem(new SecurityRequirement().addList("apiKeyAuth"))
             .paths(paths)
             .components(new Components()
+                .addSecuritySchemes("basicAuth", new SecurityScheme().type(Type.HTTP).scheme("basic"))
+                .addSecuritySchemes("apiKeyAuth", new SecurityScheme().type(Type.APIKEY).in(In.HEADER)
+                    .name(properties.getAuthentication().getApiKeyName()))
                 .addResponses("UnauthorizedError", new ApiResponse()
                     .description("Authentication information is missing or invalid")
                     .addHeaderObject("WWW_Authenticate", new Header().schema(new StringSchema()))
@@ -124,13 +140,7 @@ public class OpenApiSpecConverter {
                         .addMediaType("application/json", new MediaType()
                             .schema(new ObjectSchema()
                                 .addProperty("user_message", new StringSchema())
-                                .addProperty("api_message", new StringSchema())))))
-                .addSecuritySchemes("basicAuth", new SecurityScheme().type(Type.HTTP).scheme("basic"))
-                .addSecuritySchemes("apiKeyAuth", new SecurityScheme().type(Type.APIKEY).in(In.HEADER).name(
-                    XplanRapiProperties.XPLAN_API_KEY_NAME)))
-            .addSecurityItem(new SecurityRequirement().addList("apiKeyAuth"));
-
-        return openAPI;
+                                .addProperty("api_message", new StringSchema()))))));
     }
 
     /**
