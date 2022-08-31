@@ -1,19 +1,27 @@
 package dev.ueslei.xplantoopenapi.rapi;
 
+import dev.ueslei.xplantoopenapi.config.XplanRapiProperties;
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.PathItem.HttpMethod;
 import io.swagger.v3.oas.models.Paths;
+import io.swagger.v3.oas.models.headers.Header;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.security.SecurityScheme.In;
+import io.swagger.v3.oas.models.security.SecurityScheme.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -66,20 +74,22 @@ public class OpenApiSpecConverter {
                         var col = cols.get(j);
                         var colValue = col.text();
                         if (col.hasClass("restparamcomment")) {
-                            isArraySection = colValue.contains("Array of Object");
+                            isArraySection = colValue.toLowerCase().contains("array of object");
                         } else {
                             var fieldSpec = FieldSpecification.fromIndex(j);
 
                             switch (section) {
                                 case ARGUMENTS:
-                                    parameter = Optional.of(populateParameter(parameter, fieldSpec, colValue, "path"));
+                                    parameter = Optional.of(
+                                        populateRequestParameter(parameter, fieldSpec, colValue, "path"));
                                     break;
                                 case PARAMETERS:
-                                    parameter = Optional.of(populateParameter(parameter, fieldSpec, colValue, "query"));
+                                    parameter = Optional.of(
+                                        populateRequestParameter(parameter, fieldSpec, colValue, "query"));
                                     break;
                                 case RESPONSE:
                                     schemaProperty = Optional.of(
-                                        populateSchemaProperty(schemaProperty, fieldSpec, colValue));
+                                        populateResponseSchemaProperty(schemaProperty, fieldSpec, colValue));
                                     break;
                             }
                         }
@@ -94,7 +104,8 @@ public class OpenApiSpecConverter {
                 .addApiResponse("200", new ApiResponse().description("Success")
                     .content(new Content()
                         .addMediaType("application/json", new MediaType()
-                            .schema(reprocessResponse(operationSchema, isArraySection))))));
+                            .schema(reprocessResponse(operationSchema, isArraySection)))))
+                .addApiResponse("401", new ApiResponse().$ref("#/components/responses/UnauthorizedError")));
 
             var pathItem = Optional.ofNullable(paths.get(pathValue)).orElse(new PathItem());
             pathItem.operation(method, operation);
@@ -104,7 +115,20 @@ public class OpenApiSpecConverter {
         var openAPI = new OpenAPI()
             .openapi("3.0.3")
             .info(new Info().title(resource + " API").version("1.0.0"))
-            .paths(paths);
+            .paths(paths)
+            .components(new Components()
+                .addResponses("UnauthorizedError", new ApiResponse()
+                    .description("Authentication information is missing or invalid")
+                    .addHeaderObject("WWW_Authenticate", new Header().schema(new StringSchema()))
+                    .content(new Content()
+                        .addMediaType("application/json", new MediaType()
+                            .schema(new ObjectSchema()
+                                .addProperty("user_message", new StringSchema())
+                                .addProperty("api_message", new StringSchema())))))
+                .addSecuritySchemes("basicAuth", new SecurityScheme().type(Type.HTTP).scheme("basic"))
+                .addSecuritySchemes("apiKeyAuth", new SecurityScheme().type(Type.APIKEY).in(In.HEADER).name(
+                    XplanRapiProperties.XPLAN_API_KEY_NAME)))
+            .addSecurityItem(new SecurityRequirement().addList("apiKeyAuth"));
 
         return openAPI;
     }
@@ -173,6 +197,12 @@ public class OpenApiSpecConverter {
             });
     }
 
+    /**
+     * Reprocess operations after finally parsed, so we can create aggregated array fields.
+     *
+     * @param operation
+     * @return
+     */
     private void aggregateParameterArrays(Operation operation) {
         if (operation.getParameters() == null) {
             return;
@@ -220,21 +250,21 @@ public class OpenApiSpecConverter {
         schema.setRequired(requiredFields);
     }
 
-    private Schema populateSchemaProperty(Optional<Schema> schemaPropertyOptional,
+    private Schema populateResponseSchemaProperty(Optional<Schema> schemaPropertyOptional,
         FieldSpecification fieldSpec, String value) {
         var schemaProperty = schemaPropertyOptional.orElse(new Schema());
         switch (fieldSpec) {
             case NAME:
                 schemaProperty.setName(value);
                 break;
-            case RESTRICTION:
+            case MANDATORY:
                 if (!value.contains("optional")) {
                     // The required items will be aggregated into its parent schema during `reprocessResponse`.
                     schemaProperty.addRequiredItem(schemaProperty.getName());
                 }
                 break;
             case TYPE:
-                populateType(schemaProperty, value);
+                populateType(schemaProperty, value, false);
                 break;
             case DESCRIPTION:
                 schemaProperty.setDescription(value);
@@ -243,7 +273,7 @@ public class OpenApiSpecConverter {
         return schemaProperty;
     }
 
-    private Parameter populateParameter(Optional<Parameter> parameterOptional,
+    private Parameter populateRequestParameter(Optional<Parameter> parameterOptional,
         FieldSpecification fieldSpec,
         String value,
         String in) {
@@ -252,11 +282,11 @@ public class OpenApiSpecConverter {
             case NAME:
                 parameter.setName(value);
                 break;
-            case RESTRICTION:
+            case MANDATORY:
                 parameter.setRequired(!value.contains("optional"));
                 break;
             case TYPE:
-                parameter.setSchema(populateType(new Schema().name(parameter.getName()), value));
+                parameter.setSchema(populateType(new Schema().name(parameter.getName()), value, true));
                 break;
             case DESCRIPTION:
                 parameter.setDescription(value);
@@ -265,8 +295,8 @@ public class OpenApiSpecConverter {
         return parameter.in(in);
     }
 
-    private Schema populateType(Schema field, String typeValue) {
-        return typeConverter.convertFieldType(field, typeValue);
+    private Schema populateType(Schema field, String typeValue, boolean isRequestParameter) {
+        return typeConverter.convertFieldType(field, typeValue, isRequestParameter);
     }
 
 }

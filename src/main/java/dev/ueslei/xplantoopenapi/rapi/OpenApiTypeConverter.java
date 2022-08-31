@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class OpenApiTypeConverter {
 
-    public Schema convertFieldType(Schema field, String typeValue) {
+    public Schema convertFieldType(Schema field, String typeValue, boolean isRequestParameter) {
         String oasType = "string";
 
         if (typeValue.toLowerCase().contains("integer")) {
@@ -18,9 +18,13 @@ public class OpenApiTypeConverter {
         }
 
         if (typeValue.toLowerCase().contains("decimal")) {
-            oasType = "object";
-            field.addProperty("_val", new NumberSchema());
-            field.addProperty("_type", new StringSchema());
+            if (isRequestParameter) {
+                oasType = "number";
+            } else {
+                oasType = "object";
+                field.addProperty("_val", new NumberSchema());
+                field.addProperty("_type", new StringSchema());
+            }
         }
 
         if (typeValue.toLowerCase().contains("boolean")) {
@@ -46,9 +50,13 @@ public class OpenApiTypeConverter {
         }
 
         if (typeValue.toLowerCase().contains("date")) {
-            oasType = "object";
-            field.addProperty("_val", new DateSchema());
-            field.addProperty("_type", new StringSchema());
+            if (isRequestParameter) {
+                field.format("date");
+            } else {
+                oasType = "object";
+                field.addProperty("_val", new DateSchema());
+                field.addProperty("_type", new StringSchema());
+            }
         }
 
         return field.type(oasType);

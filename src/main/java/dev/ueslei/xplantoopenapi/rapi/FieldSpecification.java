@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 public enum FieldSpecification {
     NAME(0),
-    RESTRICTION(1),
+    MANDATORY(1),
     TYPE(2),
     DESCRIPTION(3);
 
