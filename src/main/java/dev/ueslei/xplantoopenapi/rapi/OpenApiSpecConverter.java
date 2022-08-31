@@ -36,7 +36,6 @@ import lombok.RequiredArgsConstructor;
 import org.apache.hc.client5.http.auth.AuthenticationException;
 import org.apache.hc.core5.http.ParseException;
 import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -52,7 +51,7 @@ public class OpenApiSpecConverter {
 
     public OpenAPI generateOpenApiSpec(String uri) throws AuthenticationException, IOException, ParseException {
         var xplanDocument = client.fetchXplanDocument(uri);
-        Document document = Jsoup.parse(xplanDocument);
+        var document = Jsoup.parse(xplanDocument);
 
         var resource = document.select("h2").first().text();
         var resourceId = resource.replaceAll(" ", "");
@@ -64,7 +63,9 @@ public class OpenApiSpecConverter {
             var method = HttpMethod.valueOf(pathParts[0]);
             var pathValue = formatPath(pathParts[1]);
 
-            var operation = new Operation().operationId(method.name().toLowerCase() + resourceId);
+            var operation = new Operation()
+                .operationId(method.name().toLowerCase() + resourceId)
+                .addTagsItem(resourceId);
             var operationSchema = new ObjectSchema().name(resourceId + "Response");
 
             var paramsTable = element.getElementsByClass("restparams").get(0);
@@ -135,7 +136,7 @@ public class OpenApiSpecConverter {
                     .name(properties.getAuthentication().getApiKeyName()))
                 .addResponses("UnauthorizedError", new ApiResponse()
                     .description("Authentication information is missing or invalid")
-                    .addHeaderObject("WWW_Authenticate", new Header().schema(new StringSchema()))
+                    .addHeaderObject("WWW-Authenticate", new Header().schema(new StringSchema()))
                     .content(new Content()
                         .addMediaType("application/json", new MediaType()
                             .schema(new ObjectSchema()
