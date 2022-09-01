@@ -19,7 +19,6 @@ import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
-import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.security.SecurityScheme.In;
 import io.swagger.v3.oas.models.security.SecurityScheme.Type;
@@ -128,7 +127,6 @@ public class OpenApiSpecConverter {
             .openapi("3.0.3")
             .info(new Info().title(resource + " API").version("1.0.0"))
             .addServersItem(new Server().description("Development Server").url(URI.create(uri).getHost()))
-            .addSecurityItem(new SecurityRequirement().addList("apiKeyAuth"))
             .paths(paths)
             .components(new Components()
                 .addSecuritySchemes("basicAuth", new SecurityScheme().type(Type.HTTP).scheme("basic"))
