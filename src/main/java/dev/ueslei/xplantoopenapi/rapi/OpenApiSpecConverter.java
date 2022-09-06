@@ -116,7 +116,7 @@ public class OpenApiSpecConverter {
                     .content(new Content()
                         .addMediaType("application/json", new MediaType()
                             .schema(reprocessResponse(operationSchema, isArraySection)))))
-                .addApiResponse("401", new ApiResponse().$ref("#/components/responses/UnauthorizedError")));
+                .addApiResponse("401", new ApiResponse().$ref("#/components/responses/ResponseError")));
 
             var pathItem = Optional.ofNullable(paths.get(pathValue)).orElse(new PathItem());
             pathItem.operation(method, operation);
@@ -126,18 +126,18 @@ public class OpenApiSpecConverter {
         return new OpenAPI()
             .openapi("3.0.3")
             .info(new Info().title(resource + " API").version("1.0.0"))
-            .addServersItem(new Server().description("Development Server").url(URI.create(uri).getHost()))
+            .addServersItem(new Server().description("Default Server").url(URI.create(uri).getHost()))
             .paths(paths)
             .components(new Components()
                 .addSecuritySchemes("basicAuth", new SecurityScheme().type(Type.HTTP).scheme("basic"))
                 .addSecuritySchemes("apiKeyAuth", new SecurityScheme().type(Type.APIKEY).in(In.HEADER)
                     .name(properties.getAuthentication().getApiKeyName()))
-                .addResponses("UnauthorizedError", new ApiResponse()
-                    .description("Authentication information is missing or invalid")
-                    .addHeaderObject("WWW-Authenticate", new Header().schema(new StringSchema()))
+                .addResponses("ResponseError", new ApiResponse()
+                    .description("Response Error Details")
                     .content(new Content()
                         .addMediaType("application/json", new MediaType()
                             .schema(new ObjectSchema()
+                                .addProperty("schema_type", new StringSchema())
                                 .addProperty("user_message", new StringSchema())
                                 .addProperty("api_message", new StringSchema()))))));
     }

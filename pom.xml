@@ -10,12 +10,13 @@
     </parent>
     <groupId>dev.ueslei</groupId>
     <artifactId>xplan-rapi-to-openapi</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>xplan-rapi-to-openapi</name>
     <description>xplan-rapi-to-openapi</description>
     <properties>
         <java.version>17</java.version>
         <spring-shell.version>2.1.1</spring-shell.version>
+        <docker.registry>uesleilima</docker.registry>
     </properties>
     <dependencies>
         <dependency>
@@ -34,7 +35,7 @@
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
-            <version>1.15.2</version>
+            <version>1.15.3</version>
         </dependency>
         <dependency>
             <groupId>io.swagger.core.v3</groupId>
@@ -81,6 +82,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <imageName>${docker.registry}/${project.artifactId}:${project.version}</imageName>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
