@@ -94,4 +94,59 @@
         </plugins>
     </build>
 
+    <profiles>
+        <profile>
+            <id>jib-push</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.google.cloud.tools</groupId>
+                        <artifactId>jib-maven-plugin</artifactId>
+                        <version>3.2.1</version>
+                        <configuration>
+                            <from>
+                                <platforms>
+                                    <platform>
+                                        <architecture>amd64</architecture>
+                                        <os>linux</os>
+                                    </platform>
+                                    <platform>
+                                        <architecture>arm64</architecture>
+                                        <os>linux</os>
+                                    </platform>
+                                </platforms>
+                            </from>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>push-version-tag</id>
+                                <phase>package</phase>
+                                <configuration>
+                                    <to>
+                                        <image>${docker.registry}/${project.artifactId}:${project.version}</image>
+                                    </to>
+                                </configuration>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>push-latest-tag</id>
+                                <phase>package</phase>
+                                <configuration>
+                                    <to>
+                                        <image>${docker.registry}/${project.artifactId}:latest</image>
+                                    </to>
+                                </configuration>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
