@@ -23,7 +23,9 @@ public class XplanDocumentHandler {
         .addMixIn(MediaType.class, MediaTypeMixin.class);
 
     @ShellMethod("Generates a XPLAN Resourceful API document into an OpenApi 3 specification json.")
-    public void generate(String uri, @ShellOption(defaultValue = "") String output) throws Exception {
+    public void generate(
+        @ShellOption({"-u", "--uri"}) String uri,
+        @ShellOption(value = {"-o", "--output"}, defaultValue = "/tmp/openapi.json") String output) throws Exception {
         var oasSpec = converter.generateOpenApiSpec(uri);
         var writer = mapper.writerWithDefaultPrettyPrinter();
         if (output.isEmpty()) {
@@ -33,6 +35,5 @@ public class XplanDocumentHandler {
             writer.writeValue(Path.of(output).toFile(), oasSpec);
         }
     }
-
 
 }

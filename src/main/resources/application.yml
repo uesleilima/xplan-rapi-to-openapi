@@ -8,4 +8,6 @@ xplan:
     password: ${XPLAN_PASSWORD}
     api-key-name: X-Xplan-App-Id
     api-key-value: ${XPLAN_APP_ID}
-
+logging:
+  level:
+    root: error
