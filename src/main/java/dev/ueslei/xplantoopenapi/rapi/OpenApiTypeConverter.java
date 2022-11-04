@@ -45,8 +45,13 @@ public class OpenApiTypeConverter {
         }
 
         if (typeValue.toLowerCase().contains("dictionary")) {
-            oasType = "array";
-            field.items(new StringSchema());
+            if (isRequestParameter) {
+                oasType = "array";
+                field.items(new StringSchema());
+            } else {
+                oasType = "object";
+                field.additionalProperties(true);
+            }
         }
 
         if (typeValue.toLowerCase().contains("date")) {
